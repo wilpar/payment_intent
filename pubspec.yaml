@@ -1,0 +1,29 @@
+name: payment_intent
+description: Stripe Payment Intent Test
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.7.0 <3.0.0"
+
+dependencies:
+  cloud_firestore: ^1.0.7
+  cloud_functions: ^1.0.5
+  firebase_core: ^1.1.0
+  http: ^0.13.1
+  stripe_payment: ^1.0.11
+
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+
+dev_dependencies:
+
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
