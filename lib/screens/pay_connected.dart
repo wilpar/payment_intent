@@ -10,6 +10,9 @@ class PayConnectedAccount extends StatefulWidget {
 class _PayConnectedAccountState extends State<PayConnectedAccount> {
   @override
   Widget build(BuildContext context) {
-    return Container();
+    return Scaffold(
+      appBar: AppBar(title: Text('Pay a Connected Account')),
+      body: Container(),
+    );
   }
 }
