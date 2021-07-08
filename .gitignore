@@ -1,5 +1,7 @@
 ios/Runner/GoogleService-Info.plist
 
+lib/config.dart
+
 # Miscellaneous
 *.class
 *.log

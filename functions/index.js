@@ -1,20 +1,43 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-const stripe = require('stripe')(functions.config().stripe.secretkey, {apiVersion: '2020-08-27'});
+const stripe = require('stripe')(functions.config().stripe.secretkey, { apiVersion: '2020-08-27' });
 
 exports.pub_key = functions.https.onRequest(async (req, res) => {
   res.json({ publishable_key: functions.config().stripe.pubkey });
 });
 
 exports.create_payment_intent = functions.https.onRequest(async (req, res) => {
+
+  const customers = await stripe.customers.list()
+  const customer = customers.data[0]
+
+  if (!customer) {
+    res.send({
+      error: 'You have no customer created',
+    })
+  }
+
   try {
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+      { customer: customer.id },
+      { apiVersion: '2020-08-27' }
+    )
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: req.query.amount,
-      currency: req.query.currency,    
-    });
-    res.json({ clientSecret: paymentIntent.client_secret });
-  } catch(err) {
-    res.status(400).json({ error: { message: err.message } })
+      amount: 10000,
+      currency: 'usd',
+      customer: customer.id,
+    })
+    res.json({
+      paymentIntent: paymentIntent.client_secret,
+      ephemeralKey: ephemeralKey.secret,
+      customer: customer.id,
+    })
+  } catch (err) {
+    res.status(400).json({
+      error: {
+        message: err.message
+      }
+    })
   }
 });
 
@@ -37,19 +60,16 @@ exports.whca = functions.https.onRequest(async (req, res) => {
     return res.status(400).send(`Webhook Error: ${error.message}`);
   }
 
-  let dataObject = event.data.object;
-
-  const hookRef = admin.firestore().collection('webhooks').doc(dataObject.id);
+  const hookRef = admin.firestore().collection('webhooks').doc(event.id);
   const doc = await hookRef.get();
   if (!doc.exists) {
-    let whSource = { a_source: 'whca'};
-    let whStatus = { a_status: 'new'};
-    let whType = { a_type: event.type };
-    let combinedObject = {...dataObject, ...whSource, ...whStatus, ...whType};
+    let whSource = { source: 'whca' };
+    let whStatus = { status: 'unprocessed' };
+    let combinedObject = { ...event, ...whSource, ...whStatus };
     await hookRef.set(combinedObject);
-    return res.json({ received: true});
+    return res.json({ received: true });
   } else {
-    return res.json({ received: true, dupe: true});
+    return res.json({ received: true, duplicate: true });
   }
 })
 
@@ -69,35 +89,32 @@ exports.whca_connect = functions.https.onRequest(async (req, res) => {
     return res.status(400).send(`Webhook Error: ${error.message}`);
   }
 
-  let dataObject = event.data.object;
-
-  const hookRef = admin.firestore().collection('webhooks').doc(dataObject.id);
+  const hookRef = admin.firestore().collection('webhooks').doc(event.id);
   const doc = await hookRef.get();
   if (!doc.exists) {
-    let whSource = { a_source: 'whca_connect'};
-    let whStatus = { a_status: 'new'};
-    let whType = { a_type: event.type };
-    let combinedObject = {...dataObject, ...whSource, ...whStatus, ...whType};
+    let whSource = { source: 'whca_connect' };
+    let whStatus = { status: 'unprocessed' };
+    let combinedObject = { ...event, ...whSource, ...whStatus };
     await hookRef.set(combinedObject);
-    return res.json({ received: true});
+    return res.json({ received: true });
   } else {
-    return res.json({ received: true, dupe: true});
+    return res.json({ received: true, duplicate: true });
   }
 })
 
 //  3. webhookProcessor
-exports.webhookProcessor = functions.firestore.document('webhooks/{docId}b ').onCreate((snapshot, context) => {
-  const data = snapshot.data();
-  if (data.a_status == 'processed') {
+exports.webhookProcessor = functions.firestore.document('webhooks/{docId}').onCreate((snapshot, context) => {
+  let event = snapshot.data()
+  if (event.status == 'processed') {
     return null;
   }
-  switch(data.a_type) {
+  switch (event.type) {
     case 'account.updated':
-      functions.logger.info(`Account Updated: ${data.id}`);
+      functions.logger.info(`Account Updated Event: ${event.id}`);
       break;
     default:
-      functions.logger.error(`Unhandled Event: ${data.a_type}`);
+      functions.logger.error(`Unhandled Event: ${event.type}`);
       break;
   }
-  return snapshot.ref.set({a_status: 'processed'}, {merge: true});
+  return snapshot.ref.set({ status: 'processed' }, { merge: true });
 })
