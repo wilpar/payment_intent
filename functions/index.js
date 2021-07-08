@@ -41,6 +41,53 @@ exports.create_payment_intent = functions.https.onRequest(async (req, res) => {
   }
 });
 
+exports.connected_payment_intent = functions.https.onRequest(async (req, res) => {
+  const platformCustomers = await stripe.customers.list()
+  const platformCustomer = platformCustomers.data[0]
+  const connectedAccountId = req.query.acct
+
+  if (!platformCustomer) {
+    res.send({
+      error: 'Platform has no Customers.',
+    })
+  }
+
+  try {
+    // should check if customer already exists on connected account
+    const connectedCustomer = await stripe.customers.create({
+      email: platformCustomer.email
+    }, {
+      stripeAccount: connectedAccountId
+    })
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+      { customer: connectedCustomer.id },
+      {
+        apiVersion: '2020-08-27',
+        stripeAccount: connectedAccountId,
+      }
+    )
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: 10000,
+      application_fee_amount: 1000,
+      currency: 'usd',
+      customer: connectedCustomer.id,
+    }, {
+      stripeAccount: connectedAccountId,
+    })
+    res.json({
+      ephemeralKey: ephemeralKey.secret,
+      paymentIntent: paymentIntent.client_secret,
+      customer: connectedCustomer.id,
+    })
+  } catch (err) {
+    res.status(400).json({
+      error: {
+        message: err.message
+      }
+    })
+  }
+})
+
 // firebase functions:config:set stripe.webhook="xxx"
 // firebase functions:config:set stripe.connect-webhook="yyy"
 

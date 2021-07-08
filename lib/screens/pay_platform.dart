@@ -38,7 +38,7 @@ class _PayThePlatformState extends State<PayThePlatform> {
     );
   }
 
-  Future<Map<String, dynamic>> _createTestPaymentSheet() async {
+  Future<Map<String, dynamic>> _createPaymentSheet() async {
     final String endpoint = "create_payment_intent";
     final http.Response response = await http.post(
       Uri.parse('$kApiUrl/$endpoint'),
@@ -52,7 +52,7 @@ class _PayThePlatformState extends State<PayThePlatform> {
   Future<void> _initPaymentSheet() async {
     try {
       // 1. create payment intent on the server
-      _paymentSheetData = await _createTestPaymentSheet();
+      _paymentSheetData = await _createPaymentSheet();
 
       if (_paymentSheetData!['error'] != null) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -90,10 +90,11 @@ class _PayThePlatformState extends State<PayThePlatform> {
     try {
       // 4. display the payment sheet.
       await Stripe.instance.presentPaymentSheet(
-          parameters: PresentPaymentSheetParameters(
-        clientSecret: _paymentSheetData!['paymentIntent'],
-        confirmPayment: true,
-      ));
+        parameters: PresentPaymentSheetParameters(
+          clientSecret: _paymentSheetData!['paymentIntent'],
+          confirmPayment: true,
+        ),
+      );
 
       // DO NOT REUSE PAYMENT INTENTS -F50
       setState(() {
